@@ -4,14 +4,14 @@ import { RewardsDistributor } from "../target/types/rewards_distributor";
 import { Keypair } from "@solana/web3.js";
 import { assert, expect } from "chai";
 
-describe("update admin instruction", () => {
+describe("pause instruction", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const admin = provider.wallet as anchor.Wallet;
-  const new_admin = provider.wallet as anchor.Wallet;
-  const unauthorized_admin = anchor.web3.Keypair.generate();
+  const manager = provider.wallet as anchor.Wallet;
+  const unauthorized_manager = anchor.web3.Keypair.generate();
+  const agent = anchor.web3.Keypair.generate();
 
   const program = anchor.workspace
     .RewardsDistributor as Program<RewardsDistributor>;
@@ -26,18 +26,18 @@ describe("update admin instruction", () => {
     });
 
     await program.methods
-      .initialize()
+      .initialize(agent.publicKey, new anchor.BN(0))
       .accounts({
-        admin: admin.publicKey,
+        manager: manager.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,
       })
       .signers([rewardsAccountKeypair])
       .rpc();
-    const currentAdmin = await program.account.rewardsAccount.fetch(
+    const rewardAccount = await program.account.rewardsAccount.fetch(
       rewardsAccountKeypair.publicKey
     );
     assert(
-      currentAdmin.admin.equals(admin.publicKey),
+      rewardAccount.manager.equals(manager.publicKey),
       "Public keys should be the same"
     );
 
@@ -45,56 +45,22 @@ describe("update admin instruction", () => {
     let initializedEvent = events[0];
 
     assert(
-      initializedEvent.admin.equals(admin.publicKey),
+      initializedEvent.manager.equals(manager.publicKey),
       "Public keys should be the same"
     );
 
     program.removeEventListener(listener);
   });
 
-  it("authorized update admin", async () => {
-    let events = [];
-    let listener = program.addEventListener("AdminUpdated", (event: any) => {
-      events.push(event);
-    });
-
-    await program.methods
-      .updateAdmin(new_admin.publicKey)
-      .accounts({
-        admin: admin.publicKey,
-        rewardsAccount: rewardsAccountKeypair.publicKey,
-      })
-      .rpc();
-
-    const currentAdmin = await program.account.rewardsAccount.fetch(
-      rewardsAccountKeypair.publicKey
-    );
-
-    assert(
-      currentAdmin.admin.equals(new_admin.publicKey),
-      "Public keys should be the same"
-    );
-
-    assert.equal(events.length, 1);
-    let adminUpdatedEvent = events[0];
-
-    assert(
-      adminUpdatedEvent.newAdmin.equals(new_admin.publicKey),
-      "Public keys should be the same"
-    );
-
-    program.removeEventListener(listener);
-  });
-
-  it("unauthorized update admin", async () => {
+  it("unathorized pubkey cannot call pause", async () => {
     try {
       await program.methods
-        .updateAdmin(new_admin.publicKey)
+        .pause()
         .accounts({
-          admin: unauthorized_admin.publicKey,
+          manager: unauthorized_manager.publicKey,
           rewardsAccount: rewardsAccountKeypair.publicKey,
         })
-        .signers([unauthorized_admin])
+        .signers([unauthorized_manager])
         .rpc();
       // we use this to make sure we definitely throw an error
       assert(false, "should've failed but didn't ");
@@ -103,6 +69,41 @@ describe("update admin instruction", () => {
       const err: AnchorError = _err;
       expect(err.error.errorCode.number).to.equal(6000);
       expect(err.error.errorCode.code).to.equal("Unauthorized");
+      expect(err.program.equals(program.programId)).is.true;
+    }
+  });
+
+  it("authorized manager can pause program", async () => {
+    await program.methods
+      .pause()
+      .accounts({
+        manager: manager.publicKey,
+        rewardsAccount: rewardsAccountKeypair.publicKey,
+      })
+      .rpc();
+
+    const rewardAccount = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
+    );
+    assert(rewardAccount.isPaused, "Paused boolean should be true");
+  });
+
+  it("authorized manager cannot pause program when program is already paused", async () => {
+    try {
+      await program.methods
+        .pause()
+        .accounts({
+          manager: manager.publicKey,
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+        })
+        .rpc();
+      // we use this to make sure we definitely throw an error
+      assert(false, "should've failed but didn't ");
+    } catch (_err) {
+      expect(_err).to.be.instanceOf(AnchorError);
+      const err: AnchorError = _err;
+      expect(err.error.errorCode.number).to.equal(6004);
+      expect(err.error.errorCode.code).to.equal("ShouldNotBePaused");
       expect(err.program.equals(program.programId)).is.true;
     }
   });

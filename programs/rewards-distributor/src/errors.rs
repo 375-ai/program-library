@@ -10,10 +10,6 @@ pub enum ErrorCode {
     #[msg("Unauthorized signer")]
     Unauthorized,
 
-    /// Error indicating that the maximum number of claimed nodes has been exceeded.
-    #[msg("Exceeded maximum number of claimed nodes.")]
-    ExceededMaxNumNodes,
-
     /// Error indicating that the token account owner does not match the intended owner.
     #[msg("Token account owner did not match intended owner")]
     OwnerMismatch,
@@ -22,11 +18,23 @@ pub enum ErrorCode {
     #[msg("Drop already claimed")]
     DropAlreadyClaimed,
 
-    /// Error indicating that the provided proof is invalid.
-    #[msg("Invalid Proof")]
+    /// Error indicating that the provided merkle tree proof is invalid.
+    #[msg("Invalid proof")]
     InvalidProof,
 
-    /// Error indicating that the claim exceeds the maximum allowable amount.
-    #[msg("Exceeded Max Claim")]
-    ExceededMaxClaim,
+    /// Error indicating that the operation cannot be performed because the program is currently paused.
+    #[msg("Operation not allowed: Program is currently paused.")]
+    ShouldNotBePaused,
+
+    /// Error indicating that the operation requires the program to be paused.
+    #[msg("Operation requires the program to be paused.")]
+    ShouldBePaused,
+
+    /// Error indicating that the operation cannot be performed because the epoch is already approved.
+    #[msg("Operation not allowed: Epoch is already approved.")]
+    EpochShouldNotBeApproved,
+
+    /// Error indicating that the operation cannot be performed because the previous epoch is not approved.
+    #[msg("Operation not allowed: Previous epoch is not approved.")]
+    PreviousEpochIsNotApproved,
 }

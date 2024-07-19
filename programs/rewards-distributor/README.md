@@ -1,93 +1,121 @@
 # Rewards Distributor
 
-This document provides detailed instructions on how to use the various functionalities of the Rewards program.
+This document provides detailed instructions on how to use the various functionalities of the Rewards Distributor program.
 
 ## Address
 
-**HUQgMMSpb47bbDfavp27CZ78cJyYfCWR3i1GG4KbBB4m**
+**2dUMVSQkKUu1YTUrt5xW1w1A27HmnnsoDhn1QKrYPaCS**
 
 ## Project Purpose
 
-The purpose of the Rewards Distributor is to enable users to claim rewards after participating in a two-week epoch. This system ensures that participants are rewarded fairly and efficiently based on their contributions during the epoch.
+The purpose of the Rewards Distributor is to enable users to claim rewards based on the data they produce in the network during a two-week epoch. After the epoch concludes and is approved, users can claim their rewards, ensuring that contributions are fairly and efficiently rewarded.
 
-## Project Features
+## **ACL**
 
-- **Initialization**: Sets up the admin and prepares the rewards program.
-- **Admin Update**: Allows the current admin to transfer admin rights to a new admin.
-- **Merkle Distributor Setup**: Configures the reward distribution system using a Merkle tree.
-- **Reward Claiming**: Enables users to claim their rewards based on the Merkle tree distribution.
+- **Agent**
+   - This role can only submit the rewards distribution information for each epoch (merkle tree root hash)
+- **Manager**
+   - This role can:
+      - Change the agent
+      - Propose a new manager to take over the role (initiate the 2-step process for changing the manager)
+      - Approve the rewards distribution information for an epoch
 
-## Project Business Logic
+## **Data**
 
-The rewards distributor uses Merkle trees submitted by the admin to determine the amount of funds each user can claim. The process involves initializing the contract, setting up the Merkle distributor, and allowing users to claim their rewards based on their proof of participation.
+### **Global**
 
-## Instructions
+- `agent` - the address of the agent user
+- `manager` - the address of the manager user
+- `proposed_manager` - the address for the new manager
+- `current_epoch_nr` - current epoch number
+- `current_approved_epoch` - currently approved epoch number
+- `epoch_length` - duration of the epoch expressed in number of blocks
+- `is_paused` - indicates if the protocol is paused, which means that no operations can be executed
 
-The Rewards program includes several key instructions to manage and claim rewards. Below are the details:
+### **For each epoch**
 
-### 1. Initialize
+- `epoch_nr` - epoch number (starts at 1)
+- `is_approved` - indicates if the rewards distribution information has been approved by the manager
+- `hash` - merkle tree root hash (rewards distribution information)
 
-The `initialize` instruction serves as the constructor for the program. It sets the admin and prepares the program for use.
+## **Instructions**
 
-Parameters:
-- `ctx`: The context for the instruction.
+- **Initialize**
+   - Bootstraps the smart contract and stores all the parameters for it:
+      - `agent`
+      - `manager` (set to the address of the deployer)
+      - `current_epoch_nr` (set to `0`)
+      - `currently_approved_epoch_nr` (set to `0`)
+      - `epoch_length`
+      - `is_paused` (set to `false`)
+   - Emits event
+- **Change agent**
+   - Changes the address of the agent user.
+   - **Preconditions**
+      - The caller must be a manager
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Propose manager**
+   - Initiates the 2-step process for changing the manager. This will set the `proposed_manager` property.
+   - **Preconditions**
+      - The caller must be a manager
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Accept manager**
+   - Finalizes the 2-step process for changing the manager. This will set the `manager` to the value from the `proposed_manager` property, and will unset the `proposed_manager`.
+   - **Preconditions**
+      - The caller must be the proposed manager
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Add epoch**
+   - Creates a new epoch.
+      - This operation will set the data for that epoch to:
+         - `epoch_nr` = `currently_approved_epoch_nr` + `1`
+         - `is_approved` = `false`
+         - `hash` = instruction argument
+      - This operation will also change the global data to:
+         - `current_epoch_nr` = `currently_approved_epoch_nr` + `1`
+   - **Preconditions**
+      - The `is_approved` flag for each previous epoch must be `true`
+      - The caller must be an agent
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Correct epoch**
+   - Updates the rewards distribution information (merkle tree root hash). This will only change the `hash` property for an epoch only while the epoch is not approved.
+   - **Preconditions**
+      - The `is_approved` flag for the epoch must be set to `false`
+      - The caller must be an agent
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Approve epoch**
+   - Operations
+      - Changes the `is_approved` flag for the epoch to `true`
+      - Transfers tokens from the caller to the epoch ATA
+   - ***Note***: After this operation the epoch is locked (no modifications can happen anymore) and users can start claiming the tokens from it.
+   - **Preconditions**
+      - The `is_approved` flag for the epoch must be `false`
+      - The caller must be a manager
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Claim rewards for epoch**
+   - Transfers all the allocated tokens from the epoch ATA to the user.
+   - **Precoditions**
+      - Rewards allocation for this user must be present in the merkle tree
+      - The `is_paused` flag must be `false`
+   - Emits event
+- **Pause**
+   - Sets the `is_paused` flag to `true`
+   - **Preconditions**
+      - The `is_paused` flag is `false`
+      - The caller must be a manager
+   - Emits event
+- **Unpause**
+   - Sets the `is_paused` flag to `false`
+   - **Preconditions**
+      - The `is_paused` flag is `true`
+      - The caller must be a manager
+   - Emits event
 
-### 2. Update Admin
+## Rewards Distributor Program Diagram
 
-The `update_admin` instruction allows the current admin to assign a new admin. This instruction can only be executed by the existing admin.
-
-Parameters:
-- `ctx`: The context for the instruction.
-- `new_admin`: The address (Pubkey) of the new admin to be set.
-
-### 3. Set Merkle Distributor
-
-The `set_merkle_distributor` instruction configures the Merkle distributor. This distributor manages the distribution of rewards based on a Merkle tree. This instruction is restricted to admin use only.
-
-Parameters:
-
-- `ctx`: The context for the instruction.
-- `bump`: A bump seed for the PDA.
-- `root`: The root of the Merkle tree used for rewards distribution.
-- `max_total_claim`: The maximum total amount that can be claimed.
-- `max_num_nodes`: The maximum number of nodes in the Merkle tree.
-
-
-### 4. Claim
-
-The `claim` instruction enables users to claim their rewards. Users can call this function to receive their rewards based on the Merkle tree distribution.
-
-Parameters:
-- `ctx`: The context for the instruction.
-- `_bump`: A bump seed for the PDA.
-- `index`: The index of the claim.
-- `amount`: The amount of reward to be claimed.
-- `proof`: The Merkle proof for the claim, a vector of 32-byte arrays.
-
-## Workflow
-The following steps outline the typical workflow for using the Rewards program:
-
-1. Initialization
-    - The admin initializes the program using the `initialize` instruction with their address.
-
-2. Setting Up the Merkle Distributor
-    - The admin sets up the Merkle distributor using the `set_merkle_distributor` instruction with the necessary parameters.
-
-3. Updating Admin (if necessary)
-    - If the admin needs to change, the current admin uses the `update_admin` instruction to assign a new admin.
-
-4. Claiming Rewards
-    - Users claim their rewards by calling the `claim` instruction with the necessary proof and amount.
-
-## Rewards Program Workflow Diagram
-```mermaid
-flowchart TD
-   A[Initialize] --> B[set_merkle_distributor]
-   B --> C[claim]
-   A -.-> D[update_admin]
-
-   A[Initialize]
-   B[set_merkle_distributor]
-   C[claim]
-   D[update_admin]
-```
+[View PDF](https://github.com/375-ai/smart-contracts/blob/main/programs/rewards-distributor/diagrams/375ai%20smart%20contracts%20diagram.pdf)

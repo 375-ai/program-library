@@ -1,4 +1,4 @@
-//! Zenith Rewards Distributor.
+//! 375ai Rewards Distributor.
 mod errors;
 mod events;
 mod instructions;
@@ -8,58 +8,121 @@ mod utils;
 use anchor_lang::prelude::*;
 pub use instructions::*;
 
-declare_id!("HUQgMMSpb47bbDfavp27CZ78cJyYfCWR3i1GG4KbBB4m");
+declare_id!("2dUMVSQkKUu1YTUrt5xW1w1A27HmnnsoDhn1QKrYPaCS");
 
 #[program]
 pub mod rewards_distributor {
     use super::*;
 
-    /// Initilizes the program and sets the signer as `Admin`.
+    /// Initializes the program and sets the signer as `Manager`.
     ///
     /// # Arguments
     ///
     /// * `ctx` - Context for the instruction.
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        initialize_handler(ctx)
+    /// * `agent` - The address of the agent user.
+    /// * `epoch_length` - duration of the epoch expressed number of blocks or seconds
+    pub fn initialize(ctx: Context<Initialize>, agent: Pubkey, epoch_length: u64) -> Result<()> {
+        initialize_handler(ctx, agent, epoch_length)
     }
 
-    /// Updates the `Admin` to `new_admin`.
-    /// Can only be called by the current `Admin`.
+    /// Propose a Pubkey to be the `Manager`.
+    /// Can only be called by the current `Manager`.
     ///
     /// # Arguments
     ///
     /// * `ctx` - Context for the instruction.
-    /// * `new_admin` - Pubkey to set as the new program admin.
+    /// * `proposed_manager` - Pubkey to set as the proposed manager.
     ///
     /// # Errors
     ///
     /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
-    pub fn update_admin(ctx: Context<UpdateAdmin>, new_admin: Pubkey) -> Result<()> {
-        update_admin_handler(ctx, new_admin)
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
+    pub fn propose_manager(ctx: Context<ProposeManager>, proposed_manager: Pubkey) -> Result<()> {
+        propose_manager_handler(ctx, proposed_manager)
     }
 
-    // Sets the merkle root for the claiming process.
-    /// Can only be called by the `Admin`.
+    /// Accepts the proposed Manager role.
+    /// Can only be called by the Proposed Manager.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Context for the instruction.
+    ///
+    /// # Errors
+    ///
+    /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
+    pub fn accept_manager(ctx: Context<AcceptManager>) -> Result<()> {
+        accept_manager_handler(ctx)
+    }
+
+    /// Change the current agent.
+    /// Can only be called by the Manager.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Context for the instruction.
+    /// * `new_agent` - Pubkey to set as the agent.
+    ///
+    /// # Errors
+    ///
+    /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
+    pub fn change_agent(ctx: Context<ChangeAgent>, new_agent: Pubkey) -> Result<()> {
+        change_agent_handler(ctx, new_agent)
+    }
+
+    /// Sets the merkle root for the claiming process.
+    /// Can only be called by the `Manager`.
     ///
     /// # Arguments
     ///
     /// * `ctx` - Context for the instruction.
     /// * `bump` - Bump seed used for Program Derived Address (PDA) generation.
     /// * `root` - Root of the merkle tree.
-    /// * `max_total_claim` - Maximum total amount that can be claimed.
-    /// * `max_num_nodes` - Maximum number of nodes in the Merkle tree.
     ///
     /// # Errors
     ///
     /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
-    pub fn set_merkle_distributor(
-        ctx: Context<NewDistributor>,
-        bump: u8,
-        root: [u8; 32],
-        max_total_claim: u64,
-        max_num_nodes: u64,
-    ) -> Result<()> {
-        set_merkle_distributor_handler(ctx, bump, root, max_total_claim, max_num_nodes)
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
+    /// * `PreviousEpochIsNotApproved` - Thrown if the previous epoch is not approved.
+    pub fn add_epoch(ctx: Context<AddEpoch>, bump: u8, root: [u8; 32]) -> Result<()> {
+        add_epoch_handler(ctx, bump, root)
+    }
+
+    /// Corrects the merkle root for a specific epoch.
+    /// Can only be called by the `Agent` only while the epoch is not approved.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Context for the instruction.
+    /// * `root` - Corrected root of the merkle tree.
+    /// * `epoch_nr` - The epoch number to correct.
+    ///
+    /// # Errors
+    ///
+    /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
+    /// * `EpochShouldNotBeApproved` - Thrown if the epoch is approved.
+    pub fn correct_epoch(ctx: Context<CorrectEpoch>, epoch_nr: u64, root: [u8; 32]) -> Result<()> {
+        correct_epoch_handler(ctx, epoch_nr, root)
+    }
+
+    /// Approves the epoch for distribution.
+    /// Can only be called by the `Manager`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Context for the instruction.
+    /// * `epoch_nr` - The epoch number to approve.
+    /// * `amount` - The amount to be approved for distribution.
+    ///
+    /// # Errors
+    ///
+    /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
+    pub fn approve_epoch(ctx: Context<ApproveEpoch>, epoch_nr: u64, amount: u64) -> Result<()> {
+        approve_epoch_handler(ctx, epoch_nr, amount)
     }
 
     /// Sends rewards to the signer if they have an allocation in the submitted Merkle tree.
@@ -74,12 +137,39 @@ pub mod rewards_distributor {
     /// # Errors
     ///
     /// * `Unauthorized` - Provided Signer is not authorized to call this instruction.
+    /// * `ShouldNotBePaused` - Thrown if the protocol is paused.
     /// * `OwnerMismatch` - Provided `to` account is not the same as reciever's public key.
     /// * `DropAlreadyClaimed` - User has already claimed.
     /// * `InvalidProof` - Provided proof is invalid.
-    /// * `ExceededMaxClaim` - User has exceeded allocated claim.
-    /// * `ExceededMaxNumNodes` - Max number of nodes has been exceeded.
     pub fn claim(ctx: Context<Claim>, index: u64, amount: u64, proof: Vec<[u8; 32]>) -> Result<()> {
         claim_handler(ctx, index, amount, proof)
+    }
+
+    /// Pauses the program.
+    /// Can only be called by the `Manager`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Context for the instruction.
+    ///
+    /// # Errors
+    ///
+    /// * `ShouldNotBePaused` - Thrown if the protocol is already paused.
+    pub fn pause(ctx: Context<Pause>) -> Result<()> {
+        pause_handler(ctx)
+    }
+
+    /// Unpauses the program.
+    /// Can only be called by the `Manager`.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Context for the instruction.
+    ///
+    /// # Errors
+    ///
+    /// * `ShouldBePaused` - Thrown if the protocol is already unpaused.
+    pub fn unpause(ctx: Context<UnPause>) -> Result<()> {
+        unpause_handler(ctx)
     }
 }

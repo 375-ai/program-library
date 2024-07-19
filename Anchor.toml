@@ -6,7 +6,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-rewards_distributor = "HUQgMMSpb47bbDfavp27CZ78cJyYfCWR3i1GG4KbBB4m"
+rewards_distributor = "2dUMVSQkKUu1YTUrt5xW1w1A27HmnnsoDhn1QKrYPaCS"
 
 [registry]
 url = "https://api.apr.dev"

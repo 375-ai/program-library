@@ -24,3 +24,13 @@ export const findClaimStatusKey = (
     program
   );
 };
+
+export const deriveEpochPDA = (epochNr: u64): [PublicKey, number] => {
+  return PublicKey.findProgramAddressSync(
+    [
+      utils.bytes.utf8.encode("EpochAccount"),
+      epochNr.toArrayLike(Buffer, "le", 8),
+    ],
+    PROGRAM_ID
+  );
+};

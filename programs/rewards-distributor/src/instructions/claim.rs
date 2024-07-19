@@ -1,6 +1,6 @@
 use crate::errors::ErrorCode;
 use crate::events::ClaimedEvent;
-use crate::state::{ClaimStatus, RewardsDistributor};
+use crate::state::{ClaimStatus, RewardsAccount, RewardsDistributor};
 use crate::utils::merkle_proof;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount};
@@ -9,6 +9,9 @@ use anchor_spl::token::{self, Token, TokenAccount};
 #[derive(Accounts)]
 #[instruction( index: u64)]
 pub struct Claim<'info> {
+    #[account(mut)]
+    pub rewards_account: Account<'info, RewardsAccount>,
+
     /// The [RewardsDistributor].
     #[account(
         mut,
@@ -60,6 +63,9 @@ pub fn claim_handler(
     amount: u64,
     proof: Vec<[u8; 32]>,
 ) -> Result<()> {
+    let rewards_account = &mut ctx.accounts.rewards_account;
+    require!(!rewards_account.is_paused, ErrorCode::ShouldNotBePaused);
+
     // Ensure the `from` and `to` accounts are different.
     require_keys_neq!(ctx.accounts.from.key(), ctx.accounts.to.key());
 
@@ -127,15 +133,6 @@ pub fn claim_handler(
     // Update the distributor's total amount claimed and number of nodes claimed.
     let distributor = &mut ctx.accounts.distributor;
     distributor.total_amount_claimed = distributor.total_amount_claimed + amount;
-    require!(
-        distributor.total_amount_claimed <= distributor.max_total_claim,
-        ErrorCode::ExceededMaxClaim
-    );
-    distributor.num_nodes_claimed += 1;
-    require!(
-        distributor.num_nodes_claimed <= distributor.max_num_nodes,
-        ErrorCode::ExceededMaxNumNodes
-    );
 
     // Emit an event indicating that the claim has been made.
     emit!(ClaimedEvent {

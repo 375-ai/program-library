@@ -1,4 +1,4 @@
-# Zenith Smart Contracts
+# 375ai Smart Contracts
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ Each program folder contains a corresponding `README.md` file that explains the 
 
 ### Rewards Distributor Program([Docs](programs/rewards-distributor/README.md)) 
 
-- Address: **HUQgMMSpb47bbDfavp27CZ78cJyYfCWR3i1GG4KbBB4m**
+- Address: **2dUMVSQkKUu1YTUrt5xW1w1A27HmnnsoDhn1QKrYPaCS**
 
 ### Technologies used
 - Rust
@@ -29,7 +29,7 @@ To compile the programs, use the following commands:
 anchor build
 
 # Install the required packages
-yarn
+yarn install
 ```
 
 ## Running TypeScript Tests

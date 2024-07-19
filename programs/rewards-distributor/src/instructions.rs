@@ -1,9 +1,21 @@
+mod accept_manager;
+mod add_epoch;
+mod approve_epoch;
+mod change_agent;
 mod claim;
+mod correct_epoch;
 mod initialize;
-mod set_merkle_distributor;
-mod update_admin;
+mod pause;
+mod propose_manager;
+mod unpause;
 
+pub use accept_manager::*;
+pub use add_epoch::*;
+pub use approve_epoch::*;
+pub use change_agent::*;
 pub use claim::*;
+pub use correct_epoch::*;
 pub use initialize::*;
-pub use set_merkle_distributor::*;
-pub use update_admin::*;
+pub use pause::*;
+pub use propose_manager::*;
+pub use unpause::*;
