@@ -118,4 +118,4 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
 
 ## Rewards Distributor Program Diagram
 
-[View PDF](https://github.com/375-ai/smart-contracts/blob/main/programs/rewards-distributor/diagrams/375ai%20smart%20contracts%20diagram.pdf)
+[View PDF](https://github.com/375-ai/program-library/blob/main/programs/rewards-distributor/diagrams/375ai%20smart%20contracts%20diagram.pdf)
