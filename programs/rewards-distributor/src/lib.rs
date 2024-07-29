@@ -141,8 +141,14 @@ pub mod rewards_distributor {
     /// * `OwnerMismatch` - Provided `to` account is not the same as reciever's public key.
     /// * `DropAlreadyClaimed` - User has already claimed.
     /// * `InvalidProof` - Provided proof is invalid.
-    pub fn claim(ctx: Context<Claim>, index: u64, amount: u64, proof: Vec<[u8; 32]>) -> Result<()> {
-        claim_handler(ctx, index, amount, proof)
+    pub fn claim(
+        ctx: Context<Claim>,
+        index: u64,
+        epoch_nr: u64,
+        amount: u64,
+        proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        claim_handler(ctx, index, epoch_nr, amount, proof)
     }
 
     /// Pauses the program.

@@ -101,7 +101,6 @@ pub fn add_epoch_handler(ctx: Context<AddEpoch>, bump: u8, root: [u8; 32]) -> Re
     distributor.base = ctx.accounts.base.key();
     distributor.bump = bump;
 
-    distributor.root = root;
     distributor.mint = ctx.accounts.mint.key();
 
     distributor.total_amount_claimed = 0;

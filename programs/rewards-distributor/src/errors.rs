@@ -34,6 +34,10 @@ pub enum ErrorCode {
     #[msg("Operation not allowed: Epoch is already approved.")]
     EpochShouldNotBeApproved,
 
+    /// Error indicating that the operation cannot be performed because the epoch is not approved.
+    #[msg("Operation not allowed: Epoch is not approved.")]
+    EpochShouldBeApproved,
+
     /// Error indicating that the operation cannot be performed because the previous epoch is not approved.
     #[msg("Operation not allowed: Previous epoch is not approved.")]
     PreviousEpochIsNotApproved,

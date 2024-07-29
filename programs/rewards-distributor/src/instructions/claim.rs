@@ -1,13 +1,13 @@
 use crate::errors::ErrorCode;
 use crate::events::ClaimedEvent;
-use crate::state::{ClaimStatus, RewardsAccount, RewardsDistributor};
+use crate::state::{ClaimStatus, EpochAccount, RewardsAccount, RewardsDistributor};
 use crate::utils::merkle_proof;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount};
 
 /// [rewards_distributor::claim] accounts.
 #[derive(Accounts)]
-#[instruction( index: u64)]
+#[instruction( index: u64, epoch_nr: u64)]
 pub struct Claim<'info> {
     #[account(mut)]
     pub rewards_account: Account<'info, RewardsAccount>,
@@ -18,6 +18,16 @@ pub struct Claim<'info> {
         address = from.owner
     )]
     pub distributor: Account<'info, RewardsDistributor>,
+
+    /// The [EpochAccount]
+    #[account(mut,
+        seeds = [
+         b"EpochAccount".as_ref(),
+         epoch_nr.to_le_bytes().as_ref(),
+    ],
+    bump
+    )]
+    pub epoch_account: Account<'info, EpochAccount>,
 
     /// Status of the claim.
     #[account(
@@ -60,11 +70,20 @@ pub struct Claim<'info> {
 pub fn claim_handler(
     ctx: Context<Claim>,
     index: u64,
+    epoch_nr: u64,
     amount: u64,
     proof: Vec<[u8; 32]>,
 ) -> Result<()> {
-    let rewards_account = &mut ctx.accounts.rewards_account;
+    let rewards_account = &ctx.accounts.rewards_account;
     require!(!rewards_account.is_paused, ErrorCode::ShouldNotBePaused);
+
+    let epoch_account = &ctx.accounts.epoch_account;
+    require!(
+        epoch_account.is_approved,
+        ErrorCode::EpochShouldBeApproved
+    );
+
+    let epoch_root = epoch_account.hash;
 
     // Ensure the `from` and `to` accounts are different.
     require_keys_neq!(ctx.accounts.from.key(), ctx.accounts.to.key());
@@ -91,7 +110,7 @@ pub fn claim_handler(
         &amount.to_le_bytes(),
     ]);
     require!(
-        merkle_proof::verify(proof, distributor.root, node.0),
+        merkle_proof::verify(proof, epoch_root, node.0),
         ErrorCode::InvalidProof
     );
 
@@ -138,7 +157,8 @@ pub fn claim_handler(
     emit!(ClaimedEvent {
         index,
         receiver: receiver_account.key(),
-        amount
+        amount,
+        epoch_nr
     });
 
     Ok(())

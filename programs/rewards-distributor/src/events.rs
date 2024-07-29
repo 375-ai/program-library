@@ -58,6 +58,8 @@ pub struct ClaimedEvent {
     pub receiver: Pubkey,
     /// Amount of the reward claimed.
     pub amount: u64,
+    /// Epoch number
+    pub epoch_nr: u64,
 }
 
 /// Event emitted when the agent is changed.

@@ -37,9 +37,6 @@ pub struct RewardsDistributor {
     /// Bump seed.
     pub bump: u8,
 
-    /// The 256-bit merkle root.
-    pub root: [u8; 32],
-
     /// [Mint] of the token to be distributed.
     pub mint: Pubkey,
 

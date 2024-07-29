@@ -1,7 +1,7 @@
 use crate::{
     errors::ErrorCode,
     events::EpochCorrected,
-    state::{EpochAccount, RewardsAccount, RewardsDistributor},
+    state::{EpochAccount, RewardsAccount},
 };
 use anchor_lang::prelude::*;
 
@@ -9,10 +9,6 @@ use anchor_lang::prelude::*;
 #[derive(Accounts)]
 #[instruction( epoch_nr: u64)]
 pub struct CorrectEpoch<'info> {
-    /// [RewardsDistributor].
-    #[account(mut)]
-    pub distributor: Account<'info, RewardsDistributor>,
-
     /// The [RewardsAccount]
     #[account(mut, has_one = agent @ ErrorCode::Unauthorized)]
     pub rewards_account: Account<'info, RewardsAccount>,
@@ -37,7 +33,6 @@ pub fn correct_epoch_handler(
     root: [u8; 32],
 ) -> Result<()> {
     let rewards_account = &mut ctx.accounts.rewards_account;
-    let distributor = &mut ctx.accounts.distributor;
     let epoch_account = &mut ctx.accounts.epoch_account;
 
     require!(!rewards_account.is_paused, ErrorCode::ShouldNotBePaused);
@@ -47,7 +42,6 @@ pub fn correct_epoch_handler(
         ErrorCode::EpochShouldNotBeApproved
     );
 
-    distributor.root = root;
     epoch_account.hash = root;
 
     emit!(EpochCorrected { root, epoch_nr });

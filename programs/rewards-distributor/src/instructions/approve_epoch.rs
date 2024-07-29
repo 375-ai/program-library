@@ -33,7 +33,11 @@ pub struct ApproveEpoch<'info> {
     pub manager: Signer<'info>,
 
     /// Distributor ATA
-    #[account(mut)]
+    #[account(
+        mut,
+        associated_token::mint = mint_account,
+        associated_token::authority = rewards_account,
+    )]
     pub distributor_token_account: Account<'info, TokenAccount>,
 
     /// Manager ATA
