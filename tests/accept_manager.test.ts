@@ -10,7 +10,7 @@ import { assert, expect } from "chai";
 // The empty public key, typically represented by 32 zeros
 const EMPTY_PUBLIC_KEY = new PublicKey("11111111111111111111111111111111");
 
-describe("accpet ownership", () => {
+describe("accept ownership", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -18,7 +18,6 @@ describe("accpet ownership", () => {
   // mock actors
   const manager = provider.wallet as anchor.Wallet;
   const proposed_manager = anchor.web3.Keypair.generate();
-  const unauthorized_manager = anchor.web3.Keypair.generate();
   const agent = anchor.web3.Keypair.generate();
   const unauthorized_agent = anchor.web3.Keypair.generate();
 
@@ -39,7 +38,7 @@ describe("accpet ownership", () => {
       .signers([rewardsAccountKeypair])
       .rpc();
 
-    // set pending admin
+    // propose manager
     await program.methods
       .proposeManager(proposed_manager.publicKey)
       .accounts({
@@ -49,7 +48,8 @@ describe("accpet ownership", () => {
       .rpc();
   });
 
-  it("pending admin can accpet ownership", async () => {
+  it("pending admin can accept ownership", async () => {
+    // accept manager
     await program.methods
       .acceptManager()
       .accounts({
@@ -78,6 +78,7 @@ describe("accpet ownership", () => {
 
   it("old manager cannot call accept ownership", async () => {
     try {
+      // accept manager
       await program.methods
         .acceptManager()
         .accounts({
@@ -87,17 +88,17 @@ describe("accpet ownership", () => {
         .rpc();
       // we use this to make sure we definitely throw an error
       assert(false, "should've failed but didn't ");
-    } catch (_err) {
-      expect(_err).to.be.instanceOf(AnchorError);
-      const err: AnchorError = _err;
-      expect(err.error.errorCode.number).to.equal(6000);
-      expect(err.error.errorCode.code).to.equal("Unauthorized");
-      expect(err.program.equals(program.programId)).is.true;
+    } catch (error) {
+      const errCode = RewardsDistributorIDL.errors.find(
+        (er) => er.name === "Unauthorized"
+      ).code;
+      expect(error.message).to.include(errCode.toString());
     }
   });
 
-  it("unathorized pubkey cannot call accept ownership", async () => {
+  it("unauthorized pubkey cannot call accept ownership", async () => {
     try {
+      // accept manager
       await program.methods
         .acceptManager()
         .accounts({
@@ -108,42 +109,52 @@ describe("accpet ownership", () => {
         .rpc();
       // we use this to make sure we definitely throw an error
       assert(false, "should've failed but didn't ");
-    } catch (_err) {
-      expect(_err).to.be.instanceOf(AnchorError);
-      const err: AnchorError = _err;
-      expect(err.error.errorCode.number).to.equal(6000);
-      expect(err.error.errorCode.code).to.equal("Unauthorized");
-      expect(err.program.equals(program.programId)).is.true;
+    } catch (error) {
+      const errCode = RewardsDistributorIDL.errors.find(
+        (er) => er.name === "Unauthorized"
+      ).code;
+      expect(error.message).to.include(errCode.toString());
     }
   });
 
-  // it("proposed manager cannot accept manager while program is paused", async () => {
-  //   try {
-  //     await program.methods
-  //       .pause()
-  //       .accounts({
-  //         manager: manager.publicKey,
-  //         rewardsAccount: rewardsAccountKeypair.publicKey,
-  //       })
-  //       .rpc()
-  //       .catch((e) => console.log({ e }));
+  it("proposed manager cannot accept manager while program is paused", async () => {
+    try {
+      // propose manager
+      await program.methods
+        .proposeManager(proposed_manager.publicKey)
+        .accounts({
+          manager: proposed_manager.publicKey,
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+        })
+        .signers([proposed_manager])
+        .rpc();
 
-  //     await program.methods
-  //       .acceptManager()
-  //       .accounts({
-  //         proposedManager: proposed_manager.publicKey,
-  //         rewardsAccount: rewardsAccountKeypair.publicKey,
-  //       })
-  //       .signers([proposed_manager])
-  //       .rpc();
-  //     // we use this to make sure we definitely throw an error
-  //     assert(false, "should've failed but didn't ");
-  //   } catch (_err) {
-  //     expect(_err).to.be.instanceOf(AnchorError);
-  //     const err: AnchorError = _err;
-  //     expect(err.error.errorCode.number).to.equal(6006);
-  //     expect(err.error.errorCode.code).to.equal("ShouldNotBePaused");
-  //     expect(err.program.equals(program.programId)).is.true;
-  //   }
-  // });
+      // pause program
+      await program.methods
+        .pause()
+        .accounts({
+          manager: proposed_manager.publicKey,
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+        })
+        .signers([proposed_manager])
+        .rpc();
+
+      // accept manager
+      await program.methods
+        .acceptManager()
+        .accounts({
+          proposedManager: proposed_manager.publicKey,
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+        })
+        .signers([proposed_manager])
+        .rpc();
+      // we use this to make sure we definitely throw an error
+      assert(false, "should've failed but didn't ");
+    } catch (error) {
+      const errCode = RewardsDistributorIDL.errors.find(
+        (er) => er.name === "ShouldNotBePaused"
+      ).code;
+      expect(error.message).to.include(errCode.toString());
+    }
+  });
 });

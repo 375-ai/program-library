@@ -52,7 +52,7 @@ describe("pause instruction", () => {
     program.removeEventListener(listener);
   });
 
-  it("unathorized pubkey cannot call pause", async () => {
+  it("unauthorized pubkey cannot call pause", async () => {
     try {
       await program.methods
         .pause()

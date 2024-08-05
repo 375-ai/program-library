@@ -113,7 +113,8 @@ pub fn add_epoch_handler(ctx: Context<AddEpoch>, bump: u8, root: [u8; 32]) -> Re
     emit!(EpochCreated {
         epoch_nr: rewards_account.current_epoch_nr,
         hash: root,
-        timestamp
+        timestamp,
+        agent: ctx.accounts.agent.key(),
     });
 
     Ok(())

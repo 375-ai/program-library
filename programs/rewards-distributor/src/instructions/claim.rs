@@ -23,7 +23,7 @@ pub struct Claim<'info> {
     #[account(mut,
         seeds = [
          b"EpochAccount".as_ref(),
-         epoch_nr.to_le_bytes().as_ref(),
+         epoch_nr.to_le_bytes().as_ref()
     ],
     bump
     )]

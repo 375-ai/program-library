@@ -1,20 +1,18 @@
 import * as anchor from "@coral-xyz/anchor";
-import { BN } from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { RewardsDistributor } from "../target/types/rewards_distributor";
-import { Keypair, SystemProgram } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { assert } from "chai";
-import { createNewMint, assertArraysEqual } from "./utils";
-import { deriveDistributorPDA } from "../src/utils/pda";
 import { writePublicKey } from "../src/utils/keyStore";
 
-describe("correct epoch instruction", () => {
+describe("change agent instruction", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const manager = provider.wallet as anchor.Wallet;
   const agent = anchor.web3.Keypair.generate();
+  const new_agent = anchor.web3.Keypair.generate();
 
   const program = anchor.workspace
     .RewardsDistributor as Program<RewardsDistributor>;
@@ -56,5 +54,21 @@ describe("correct epoch instruction", () => {
     program.removeEventListener(listener);
   });
 
-  // basic uint for correct epoch
+  it("manager can change the agent", async () => {
+    await program.methods
+      .changeAgent(new_agent.publicKey)
+      .accounts({
+        manager: manager.publicKey,
+        rewardsAccount: rewardsAccountKeypair.publicKey,
+      })
+      .rpc();
+
+    const rewardAccount = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
+    );
+    assert(
+      rewardAccount.agent.equals(new_agent.publicKey),
+      "Public keys should be the same"
+    );
+  });
 });

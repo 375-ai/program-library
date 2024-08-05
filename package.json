@@ -10,11 +10,12 @@
     "@saberhq/anchor-contrib": "^3.0.0",
     "@saberhq/solana-contrib": "^3.0.0",
     "@saberhq/token-utils": "^1.13.28",
-    "jsbi": "^4.3.0",
     "@solana/spl-token": "^0.4.6",
+    "@solana/web3.js": "^1.95.2",
     "@types/expect": "^24.3.0",
     "buffer-layout": "^1.2.2",
-    "js-sha3": "^0.9.3"
+    "js-sha3": "^0.9.3",
+    "jsbi": "^4.3.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

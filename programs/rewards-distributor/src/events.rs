@@ -44,6 +44,8 @@ pub struct EpochCreated {
     pub hash: [u8; 32],
     /// Timestamp when the root hash was submitted.
     pub timestamp: i64,
+    /// Agent
+    pub agent: Pubkey,
 }
 
 /// Event emitted when rewards are claimed.

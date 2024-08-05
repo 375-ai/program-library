@@ -3,6 +3,7 @@ use crate::events::EpochApproved;
 use crate::state::{EpochAccount, RewardsAccount, RewardsDistributor};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::associated_token::AssociatedToken;
 
 /// [rewards_distributor::approve_epoch] accounts.
 #[derive(Accounts)]
@@ -16,7 +17,7 @@ pub struct ApproveEpoch<'info> {
     #[account(mut,
         seeds = [
          b"EpochAccount".as_ref(),
-         epoch_nr.to_le_bytes().as_ref(),
+         epoch_nr.to_le_bytes().as_ref()
     ],
     bump
     )]
@@ -30,13 +31,15 @@ pub struct ApproveEpoch<'info> {
     pub distributor: Account<'info, RewardsDistributor>,
 
     /// current manager of the program.
+    #[account(mut)]
     pub manager: Signer<'info>,
 
     /// Distributor ATA
     #[account(
-        mut,
+        init,
+        payer = manager,
         associated_token::mint = mint_account,
-        associated_token::authority = rewards_account,
+        associated_token::authority = distributor,
     )]
     pub distributor_token_account: Account<'info, TokenAccount>,
 
@@ -49,11 +52,19 @@ pub struct ApproveEpoch<'info> {
 
     /// SPL [Token] program.
     pub token_program: Program<'info, Token>,
+
+    /// Associated [Token] program.
+    pub associated_token_program: Program<'info, AssociatedToken>,
+
+    /// The [System] program.
+    pub system_program: Program<'info, System>,
 }
 
 pub fn approve_epoch_handler(ctx: Context<ApproveEpoch>, epoch_nr: u64, amount: u64) -> Result<()> {
     let rewards_account = &mut ctx.accounts.rewards_account;
     require!(!rewards_account.is_paused, ErrorCode::ShouldNotBePaused);
+    
+    rewards_account.current_approved_epoch = epoch_nr;
 
     let epoch_account = &mut ctx.accounts.epoch_account;
     epoch_account.is_approved = true;

@@ -17,6 +17,7 @@ pub struct AcceptManager<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// set accept manager handler.
 pub fn accept_manager_handler(ctx: Context<AcceptManager>) -> Result<()> {
     let rewards_account = &mut ctx.accounts.rewards_account;
     let new_manager = *&ctx.accounts.proposed_manager.key();
