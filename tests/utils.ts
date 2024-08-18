@@ -164,3 +164,26 @@ export function assertArraysEqual(arr1: number[], arr2: number[]): void {
     );
   }
 }
+
+/**
+ * Performs an airdrop and waits for the confirmation.
+ * @param connection Connection.
+ * @param publicKey Public key to airdrop.
+ * @param amount Amount to airdrop.
+ */
+export const confirmedAirdrop = async (connection: anchor.web3.Connection, publicKey: PublicKey, amount: number) => {
+  const signature = await connection.requestAirdrop(
+    publicKey,
+    amount
+  );
+
+  await connection.confirmTransaction(signature);
+}
+
+/**
+ * Returns the formatted SOL balance.
+ * @param balance SOL balance in lamports.
+ */
+export const formattedSOLBalance = (balance: number) => {
+  return Math.round((balance / LAMPORTS_PER_SOL) * 100000) / 100000
+}

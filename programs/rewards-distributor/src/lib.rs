@@ -20,9 +20,8 @@ pub mod rewards_distributor {
     ///
     /// * `ctx` - Context for the instruction.
     /// * `agent` - The address of the agent user.
-    /// * `epoch_length` - duration of the epoch expressed number of blocks or seconds
-    pub fn initialize(ctx: Context<Initialize>, agent: Pubkey, epoch_length: u64) -> Result<()> {
-        initialize_handler(ctx, agent, epoch_length)
+    pub fn initialize(ctx: Context<Initialize>, agent: Pubkey) -> Result<()> {
+        initialize_handler(ctx, agent)
     }
 
     /// Propose a Pubkey to be the `Manager`.
@@ -90,7 +89,7 @@ pub mod rewards_distributor {
         add_epoch_handler(ctx, bump, root)
     }
 
-    /// Corrects the merkle root for a specific epoch.
+    /// Corrects the merkle root for a specific epoch and the mint if needed.
     /// Can only be called by the `Agent` only while the epoch is not approved.
     ///
     /// # Arguments
@@ -144,11 +143,10 @@ pub mod rewards_distributor {
     pub fn claim(
         ctx: Context<Claim>,
         index: u64,
-        epoch_nr: u64,
         amount: u64,
         proof: Vec<[u8; 32]>,
     ) -> Result<()> {
-        claim_handler(ctx, index, epoch_nr, amount, proof)
+        claim_handler(ctx, index, amount, proof)
     }
 
     /// Pauses the program.

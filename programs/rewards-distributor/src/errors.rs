@@ -41,4 +41,12 @@ pub enum ErrorCode {
     /// Error indicating that the operation cannot be performed because the previous epoch is not approved.
     #[msg("Operation not allowed: Previous epoch is not approved.")]
     PreviousEpochIsNotApproved,
+
+    /// Error indicating that the operation cannot be performed due to an invalid epoch number.
+    #[msg("Operation not allowed: Invalid epoch number.")]
+    InvalidEpochNr,
+
+    ///Error indicating that the operation cannot be performed due to an invalid mint account.
+    #[msg("Operation not allowed: Invalid mint account.")]
+    InvalidMintAccount,
 }

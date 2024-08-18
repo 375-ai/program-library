@@ -28,7 +28,7 @@ describe("change agent instruction", () => {
     });
 
     await program.methods
-      .initialize(agent.publicKey, new anchor.BN(0))
+      .initialize(agent.publicKey)
       .accounts({
         manager: manager.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,

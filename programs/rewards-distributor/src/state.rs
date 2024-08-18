@@ -21,34 +21,8 @@ pub struct RewardsAccount {
     /// The currently approved epoch number.
     pub current_approved_epoch: u64,
 
-    /// The length of each epoch.
-    pub epoch_length: u64,
-
     /// Indicates if the program is paused.
     pub is_paused: bool,
-}
-
-/// State for the account which distributes tokens.
-#[account]
-#[derive(Default)]
-pub struct RewardsDistributor {
-    /// Base key used to generate the PDA.
-    pub base: Pubkey,
-    /// Bump seed.
-    pub bump: u8,
-
-    /// [Mint] of the token to be distributed.
-    pub mint: Pubkey,
-
-    /// Total amount of tokens that have been claimed.
-    pub total_amount_claimed: u64,
-
-    /// Number of nodes that have been claimed.
-    pub num_nodes_claimed: u64,
-}
-
-impl RewardsDistributor {
-    pub const LEN: usize = PUBKEY_BYTES + 1 + 32 + PUBKEY_BYTES + 8 * 4;
 }
 
 #[account]
@@ -83,4 +57,16 @@ pub struct EpochAccount {
 
     /// Hash of the epoch.
     pub hash: [u8; 32],
+
+    /// Bump seed.
+    pub bump: u8,
+
+    /// [Mint] of the token to be distributed.
+    pub mint: Pubkey,
+
+    /// Total amount of tokens that have been claimed.
+    pub total_amount_claimed: u64,
+
+    /// Number of nodes that have been claimed.
+    pub num_nodes_claimed: u64,
 }

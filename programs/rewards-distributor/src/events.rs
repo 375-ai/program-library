@@ -46,6 +46,8 @@ pub struct EpochCreated {
     pub timestamp: i64,
     /// Agent
     pub agent: Pubkey,
+    /// Mint
+    pub mint: Pubkey,
 }
 
 /// Event emitted when rewards are claimed.
@@ -87,6 +89,7 @@ pub struct Paused {
 pub struct EpochCorrected {
     pub root: [u8; 32],
     pub epoch_nr: u64,
+    pub mint: Pubkey,
 }
 
 /// Event emitted when an epoch is aproved.

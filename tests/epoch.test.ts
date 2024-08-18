@@ -4,14 +4,10 @@ import {
   RewardsDistributor,
   IDL as RewardsDistributorIDL,
 } from "../target/types/rewards_distributor";
-import { Keypair, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import {Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram} from "@solana/web3.js";
 import { assert, expect } from "chai";
-import { createNewMint, createTokenAccount } from "./utils";
-import {
-  deriveDistributorPDA,
-  deriveEpochPDA,
-  findClaimStatusKey,
-} from "../src/utils/pda";
+import {confirmedAirdrop, createNewMint, createTokenAccount} from "./utils";
+import { deriveEpochPDA, findClaimStatusKey } from "../src/utils/pda";
 import { getKeypair, writePublicKey } from "../src/utils/keyStore";
 import { u64 } from "@saberhq/token-utils";
 import { BalanceTree } from "../src/libs/balance-tree";
@@ -31,13 +27,10 @@ describe("epoch tests", () => {
   const manager = provider.wallet as anchor.Wallet;
   const agent = anchor.web3.Keypair.generate();
   const receiver = anchor.web3.Keypair.generate();
+  const epochTwoReceiver = anchor.web3.Keypair.generate();
 
-  let distributor;
-  let distributorTokenAccount;
   let managerTokenAccount;
-  let mint;
-  let baseKey;
-  let bump;
+  let mint: PublicKey;
   let payer;
 
   const program = anchor.workspace
@@ -57,10 +50,29 @@ describe("epoch tests", () => {
 
   const corrected_root: any = tree.getRoot();
 
+  const epochTwoElements = [
+    {
+      account: epochTwoReceiver.publicKey,
+      amount: new anchor.BN(10),
+    },
+  ];
+  const epochTwoTree = new BalanceTree(epochTwoElements);
+
+  const epochTwoCorrected_root: any = epochTwoTree.getRoot();
+
   before(async () => {
+    await confirmedAirdrop(
+      provider.connection,
+      agent.publicKey,
+      LAMPORTS_PER_SOL * 5 // 5 SOL
+    );
+    await confirmedAirdrop(
+        provider.connection,
+        receiver.publicKey,
+        LAMPORTS_PER_SOL * 5 // 5 SOL
+    );
+
     payer = getKeypair("payer");
-    baseKey = Keypair.generate();
-    [distributor, bump] = await deriveDistributorPDA(baseKey.publicKey);
 
     mint = await createMint(
       provider.connection,
@@ -79,12 +91,6 @@ describe("epoch tests", () => {
       mint,
       getKeypair("payer").publicKey
       // undefined, undefined,
-    );
-
-    distributorTokenAccount = await getAssociatedTokenAddress(
-      mint,
-      distributor,
-      true
     );
 
     await mintTo(
@@ -110,13 +116,14 @@ describe("epoch tests", () => {
     });
 
     await program.methods
-      .initialize(agent.publicKey, new anchor.BN(0))
+      .initialize(agent.publicKey)
       .accounts({
         manager: manager.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,
       })
       .signers([rewardsAccountKeypair])
       .rpc();
+
     const rewardAccount = await program.account.rewardsAccount.fetch(
       rewardsAccountKeypair.publicKey
     );
@@ -146,10 +153,12 @@ describe("epoch tests", () => {
     const previous_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
     const current_epoch_nr = new u64(previous_epoch_nr.add(new anchor.BN(1)));
 
-    const [previousEpoch, previousEpochBump] = deriveEpochPDA(previous_epoch_nr);
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(current_epoch_nr);
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
 
-    const argsTuple: [number, number[]] = [bump, root];
+    const argsTuple: [number, number[]] = [currentEpochBump, root];
 
     const mintAccount = await createNewMint();
 
@@ -157,19 +166,15 @@ describe("epoch tests", () => {
       await program.methods
         .addEpoch(...argsTuple)
         .accounts({
-          base: baseKey.publicKey,
-          distributor,
           mint: mintAccount,
           systemProgram: SystemProgram.programId,
           agent: manager.publicKey,
           rewardsAccount: rewardsAccountKeypair.publicKey,
-          previousEpochAccount: previousEpoch,
           currentEpochAccount: currentEpoch,
         })
-        .signers([baseKey])
         .rpc();
       // we use this to make sure we definitely throw an error
-      assert(false, "should've failed but didn't ");
+      assert(false, "should've failed but didn't");
     } catch (_err) {
       expect(_err).to.be.instanceOf(AnchorError);
       const err: AnchorError = _err;
@@ -180,11 +185,6 @@ describe("epoch tests", () => {
   });
 
   it("agent can call add epoch", async () => {
-    await provider.connection.requestAirdrop(
-      agent.publicKey,
-      LAMPORTS_PER_SOL * 10000
-    );
-
     const root: number[] = new Array(32).fill(0);
 
     const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
@@ -193,36 +193,25 @@ describe("epoch tests", () => {
 
     const previous_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
     const current_epoch_nr = new u64(previous_epoch_nr.add(new anchor.BN(1)));
-    const [previousEpoch, previousEpochBump] = deriveEpochPDA(previous_epoch_nr);
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(current_epoch_nr);
 
-    const argsTuple: [number, number[]] = [bump, root];
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
 
-    const mint = await createMint(
-      provider.connection,
-      getKeypair("payer"),
-      // mint authority
-      getKeypair("payer").publicKey,
-      // freeze authority
-      getKeypair("payer").publicKey,
-      // decimals
-      0
-    );
+    const argsTuple: [number, number[]] = [currentEpochBump, root];
+
     await program.methods
       .addEpoch(...argsTuple)
       .accounts({
-        base: baseKey.publicKey,
-        distributor,
-        mint: mint,
+        mint,
         systemProgram: SystemProgram.programId,
         agent: agent.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,
-        previousEpochAccount: previousEpoch,
         currentEpochAccount: currentEpoch,
       })
-      .signers([baseKey, agent])
-      .rpc()
-      .catch((e) => console.log(e));
+      .signers([agent])
+      .rpc();
   });
 
   it("manager cannot call correct epoch", async () => {
@@ -232,19 +221,23 @@ describe("epoch tests", () => {
 
     const current_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
 
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(current_epoch_nr);
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
 
     try {
       await program.methods
         .correctEpoch(current_epoch_nr, corrected_root)
         .accounts({
           agent: manager.publicKey,
+          mint,
           rewardsAccount: rewardsAccountKeypair.publicKey,
           epochAccount: currentEpoch,
         })
         .rpc();
       // we use this to make sure we definitely throw an error
-      assert(false, "should've failed but didn't ");
+      assert(false, "should've failed but didn't");
     } catch (_err) {
       expect(_err).to.be.instanceOf(AnchorError);
       const err: AnchorError = _err;
@@ -261,17 +254,115 @@ describe("epoch tests", () => {
 
     const current_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
 
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(current_epoch_nr);
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
 
     await program.methods
       .correctEpoch(current_epoch_nr, corrected_root)
       .accounts({
         agent: agent.publicKey,
+        mint,
         rewardsAccount: rewardsAccountKeypair.publicKey,
         epochAccount: currentEpoch,
       })
       .signers([agent])
       .rpc();
+  });
+
+  it("agent cannot call add epoch for next epoch without approving previous epoch", async () => {
+    const root: number[] = new Array(32).fill(0);
+
+    const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
+    );
+
+    const previous_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
+    const current_epoch_nr = new u64(previous_epoch_nr.add(new anchor.BN(1)));
+
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
+
+    const argsTuple: [number, number[]] = [currentEpochBump, root];
+
+    try {
+      await program.methods
+        .addEpoch(...argsTuple)
+        .accounts({
+          mint: mint,
+          systemProgram: SystemProgram.programId,
+          agent: agent.publicKey,
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+          currentEpochAccount: currentEpoch,
+        })
+        .signers([agent])
+        .rpc();
+      // we use this to make sure we definitely throw an error
+      assert(false, "should've failed but didn't ");
+    } catch (error) {
+      const errCode = RewardsDistributorIDL.errors.find(
+        (er) => er.name === "PreviousEpochIsNotApproved"
+      ).code;
+      expect(error.message).to.include(errCode.toString());
+    }
+  });
+
+  it("manager cannot use wrong mint to approve epoch", async () => {
+    const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
+    );
+
+    const current_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
+
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
+
+    const epochAccountBeforeCall = await program.account.epochAccount.fetch(
+      currentEpoch
+    );
+    assert(!epochAccountBeforeCall.isApproved);
+
+    const wrongMint = await createMint(
+      provider.connection,
+      getKeypair("payer"),
+      // mint authority
+      getKeypair("payer").publicKey,
+      // freeze authority
+      getKeypair("payer").publicKey,
+      // decimals
+      0
+    );
+
+    const epochTokenAccount = await getAssociatedTokenAddress(
+      wrongMint,
+      currentEpoch,
+      true
+    );
+
+    try {
+      await program.methods
+        .approveEpoch(current_epoch_nr, new anchor.BN(10))
+        .accounts({
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+          epochAccount: currentEpoch,
+          manager: manager.publicKey,
+          epochTokenAccount: epochTokenAccount,
+          managerTokenAccount: managerTokenAccount,
+          mintAccount: wrongMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+    } catch (error) {
+      const errCode = RewardsDistributorIDL.errors.find(
+        (er) => er.name === "InvalidMintAccount"
+      ).code;
+      expect(error.message).to.include(errCode.toString());
+    }
   });
 
   it("manager can call approve epoch", async () => {
@@ -281,35 +372,41 @@ describe("epoch tests", () => {
 
     const current_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
 
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(current_epoch_nr);
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
 
     const epochAccountBeforeCall = await program.account.epochAccount.fetch(
       currentEpoch
     );
     assert(!epochAccountBeforeCall.isApproved);
 
+    const epochTokenAccount = await getAssociatedTokenAddress(
+      mint,
+      currentEpoch,
+      true
+    );
+
     await program.methods
       .approveEpoch(current_epoch_nr, new anchor.BN(10))
       .accounts({
         rewardsAccount: rewardsAccountKeypair.publicKey,
         epochAccount: currentEpoch,
-        distributor,
         manager: manager.publicKey,
-        distributorTokenAccount: distributorTokenAccount,
+        epochTokenAccount: epochTokenAccount,
         managerTokenAccount: managerTokenAccount,
         mintAccount: mint,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
-      .rpc()
-      .catch((e) => console.log(e));
+      .rpc();
 
     const epochAccountAfterCall = await program.account.epochAccount.fetch(
       currentEpoch
     );
     assert(epochAccountAfterCall.isApproved);
   });
-
-  it("claim rewards", async () => {
+  it("user cannot call claim with wrong mint", async () => {
     const amount = new u64(10);
     const index = new u64(0);
     const proof: any = tree.getProof(
@@ -317,41 +414,120 @@ describe("epoch tests", () => {
       receiver.publicKey,
       amount
     );
+
     const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
       rewardsAccountKeypair.publicKey
     );
     const epoch_nr = rewardAccountBeforeCall.currentApprovedEpoch;
 
-    const [claimStatus, bump] = await findClaimStatusKey(
-      index,
-      distributor,
-      program.programId
+    const argsTuple: [u64, u64, number[][]] = [index, amount, proof];
+
+    const wrongMint = await createMint(
+      provider.connection,
+      getKeypair("payer"),
+      // mint authority
+      getKeypair("payer").publicKey,
+      // freeze authority
+      getKeypair("payer").publicKey,
+      // decimals
+      0
     );
 
-    const argsTuple: [u64, anchor.BN, u64, number[][]] = [
+    const receiverTokenAccount = await getAssociatedTokenAddress(
+      wrongMint,
+      receiver.publicKey,
+      false
+    );
+
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: epoch_nr,
+    });
+
+    const [claimStatus, bump] = findClaimStatusKey({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
       index,
-      epoch_nr,
-      amount,
-      proof,
-    ];
-    const receiverTokenAccount = await createTokenAccount(
+      epochAccount: currentEpoch,
+      program: program.programId,
+    });
+
+    const distributorTokenAccount = await createTokenAccount(
+      wrongMint,
+      currentEpoch
+    );
+
+    try {
+      await program.methods
+        .claim(...argsTuple)
+        .accounts({
+          claimStatus,
+          from: distributorTokenAccount,
+          to: receiverTokenAccount,
+          receiver: receiver.publicKey,
+          rewardsAccount: rewardsAccountKeypair.publicKey,
+          epochAccount: currentEpoch,
+          mintAccount: wrongMint,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([receiver])
+        .rpc();
+    } catch (error) {
+      const errCode = RewardsDistributorIDL.errors.find(
+        (er) => er.name === "InvalidMintAccount"
+      ).code;
+      expect(error.message).to.include(errCode.toString());
+    }
+  });
+
+  it("user can call claim", async () => {
+    const amount = new u64(10);
+    const index = new u64(0);
+    const proof: any = tree.getProof(
+      index.toNumber(),
+      receiver.publicKey,
+      amount
+    );
+
+    const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
+    );
+    const epoch_nr = rewardAccountBeforeCall.currentApprovedEpoch;
+
+    const argsTuple: [u64, u64, number[][]] = [index, amount, proof];
+    const receiverTokenAccount = await getAssociatedTokenAddress(
       mint,
-      receiver.publicKey
+      receiver.publicKey,
+      false
     );
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: epoch_nr,
+    });
 
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(epoch_nr);
+    const [claimStatus, bump] = findClaimStatusKey({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      index,
+      epochAccount: currentEpoch,
+      program: program.programId,
+    });
+
+    const distributorTokenAccount = await getAssociatedTokenAddress(
+      mint,
+      currentEpoch,
+      true
+    );
 
     await program.methods
       .claim(...argsTuple)
       .accounts({
-        distributor,
         claimStatus,
         from: distributorTokenAccount,
         to: receiverTokenAccount,
         receiver: receiver.publicKey,
-        payer: payer.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,
         epochAccount: currentEpoch,
+        mintAccount: mint,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -363,43 +539,54 @@ describe("epoch tests", () => {
     const amount = new u64(100);
     const index = new u64(90001);
     const fakeReceiver = Keypair.generate();
-    let payer = getKeypair("payer");
 
-    const [claimStatus, bump] = await findClaimStatusKey(
-      index,
-      distributor,
-      program.programId
+    await confirmedAirdrop(
+        provider.connection,
+        fakeReceiver.publicKey,
+        LAMPORTS_PER_SOL * 5 // 5 SOL
     );
 
     const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
       rewardsAccountKeypair.publicKey
     );
     const epoch_nr = rewardAccountBeforeCall.currentApprovedEpoch;
-    const [currentEpoch, currentEpochBump] = deriveEpochPDA(epoch_nr);
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: epoch_nr,
+    });
 
-    const argsTuple: [u64, anchor.BN, u64, number[][]] = [
+    const [claimStatus, bump] = findClaimStatusKey({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
       index,
-      epoch_nr,
-      amount,
-      [],
-    ];
-    const fakeReceiverTokenAccount = await createTokenAccount(
+      epochAccount: currentEpoch,
+      program: program.programId,
+    });
+
+    const argsTuple: [u64, u64, number[][]] = [index, amount, []];
+
+    const fakeReceiverTokenAccount = await getAssociatedTokenAddress(
       mint,
-      fakeReceiver.publicKey
+      fakeReceiver.publicKey,
+      false
+    );
+
+    const distributorTokenAccount = await getAssociatedTokenAddress(
+      mint,
+      currentEpoch,
+      true
     );
 
     try {
       await program.methods
         .claim(...argsTuple)
         .accounts({
-          distributor,
           claimStatus,
           from: distributorTokenAccount,
           to: fakeReceiverTokenAccount,
           receiver: fakeReceiver.publicKey,
-          payer: payer.publicKey,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
+          mintAccount: mint,
           rewardsAccount: rewardsAccountKeypair.publicKey,
           epochAccount: currentEpoch,
         })
@@ -411,11 +598,78 @@ describe("epoch tests", () => {
       ).code;
       expect(error.message).to.include(errCode.toString());
     }
+  });
 
-    const bal = await provider.connection.getTokenAccountBalance(
-      fakeReceiverTokenAccount
+  it("agent can call add epoch two", async () => {
+    const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
     );
 
-    expect(bal.value.uiAmountString).to.be.eq("0");
+    const previous_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
+    const current_epoch_nr = new u64(previous_epoch_nr.add(new anchor.BN(1)));
+
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
+
+    const argsTuple: [number, number[]] = [
+      currentEpochBump,
+      epochTwoCorrected_root,
+    ];
+
+    await program.methods
+      .addEpoch(...argsTuple)
+      .accounts({
+        mint: mint,
+        systemProgram: SystemProgram.programId,
+        agent: agent.publicKey,
+        rewardsAccount: rewardsAccountKeypair.publicKey,
+        currentEpochAccount: currentEpoch,
+      })
+      .signers([agent])
+      .rpc();
+  });
+
+  it("manager can call approve epoch two", async () => {
+    const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
+      rewardsAccountKeypair.publicKey
+    );
+
+    const current_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
+
+    const [currentEpoch, currentEpochBump] = deriveEpochPDA({
+      rewardsAccountKey: rewardsAccountKeypair.publicKey,
+      epochNr: current_epoch_nr,
+    });
+
+    const epochAccountBeforeCall = await program.account.epochAccount.fetch(
+      currentEpoch
+    );
+    assert(!epochAccountBeforeCall.isApproved);
+
+    const epochTokenAccount = await getAssociatedTokenAddress(
+      mint,
+      currentEpoch,
+      true
+    );
+
+    await program.methods
+      .approveEpoch(current_epoch_nr, new anchor.BN(10))
+      .accounts({
+        rewardsAccount: rewardsAccountKeypair.publicKey,
+        epochAccount: currentEpoch,
+        manager: manager.publicKey,
+        epochTokenAccount: epochTokenAccount,
+        managerTokenAccount: managerTokenAccount,
+        mintAccount: mint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const epochAccountAfterCall = await program.account.epochAccount.fetch(
+      currentEpoch
+    );
+    assert(epochAccountAfterCall.isApproved);
   });
 });

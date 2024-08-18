@@ -17,6 +17,7 @@ describe("accept ownership", () => {
 
   // mock actors
   const manager = provider.wallet as anchor.Wallet;
+  const base = manager.publicKey
   const proposed_manager = anchor.web3.Keypair.generate();
   const agent = anchor.web3.Keypair.generate();
   const unauthorized_agent = anchor.web3.Keypair.generate();
@@ -30,7 +31,7 @@ describe("accept ownership", () => {
   before(async () => {
     // initialize program
     await program.methods
-      .initialize(agent.publicKey, new anchor.BN(0))
+      .initialize(agent.publicKey)
       .accounts({
         manager: manager.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,

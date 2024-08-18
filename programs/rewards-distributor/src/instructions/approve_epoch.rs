@@ -1,9 +1,9 @@
 use crate::errors::ErrorCode;
 use crate::events::EpochApproved;
-use crate::state::{EpochAccount, RewardsAccount, RewardsDistributor};
+use crate::state::{EpochAccount, RewardsAccount};
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 
 /// [rewards_distributor::approve_epoch] accounts.
 #[derive(Accounts)]
@@ -16,32 +16,26 @@ pub struct ApproveEpoch<'info> {
     /// The [EpochAccount]
     #[account(mut,
         seeds = [
-         b"EpochAccount".as_ref(),
-         epoch_nr.to_le_bytes().as_ref()
-    ],
-    bump
+             b"EpochAccount".as_ref(),
+             rewards_account.key().as_ref(),
+             epoch_nr.to_le_bytes().as_ref()
+        ],
+        bump
     )]
     pub epoch_account: Account<'info, EpochAccount>,
-
-    /// The [RewardsDistributor].
-    #[account(
-        mut,
-        // address = from.owner
-    )]
-    pub distributor: Account<'info, RewardsDistributor>,
 
     /// current manager of the program.
     #[account(mut)]
     pub manager: Signer<'info>,
 
-    /// Distributor ATA
+    /// Epoch ATA
     #[account(
         init,
         payer = manager,
         associated_token::mint = mint_account,
-        associated_token::authority = distributor,
+        associated_token::authority = epoch_account,
     )]
-    pub distributor_token_account: Account<'info, TokenAccount>,
+    pub epoch_token_account: Account<'info, TokenAccount>,
 
     /// Manager ATA
     #[account(mut)]
@@ -63,10 +57,20 @@ pub struct ApproveEpoch<'info> {
 pub fn approve_epoch_handler(ctx: Context<ApproveEpoch>, epoch_nr: u64, amount: u64) -> Result<()> {
     let rewards_account = &mut ctx.accounts.rewards_account;
     require!(!rewards_account.is_paused, ErrorCode::ShouldNotBePaused);
-    
+    require!(
+        epoch_nr == rewards_account.current_epoch_nr,
+        ErrorCode::InvalidEpochNr
+    );
+
     rewards_account.current_approved_epoch = epoch_nr;
 
     let epoch_account = &mut ctx.accounts.epoch_account;
+
+    require!(
+        epoch_account.mint == ctx.accounts.mint_account.key(),
+        ErrorCode::InvalidMintAccount
+    );
+
     epoch_account.is_approved = true;
 
     // Invoke the transfer instruction on the token program
@@ -75,7 +79,7 @@ pub fn approve_epoch_handler(ctx: Context<ApproveEpoch>, epoch_nr: u64, amount: 
             ctx.accounts.token_program.to_account_info(),
             Transfer {
                 from: ctx.accounts.manager_token_account.to_account_info(),
-                to: ctx.accounts.distributor_token_account.to_account_info(),
+                to: ctx.accounts.epoch_token_account.to_account_info(),
                 authority: ctx.accounts.manager.to_account_info(),
             },
         ),

@@ -29,7 +29,6 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
 - `proposed_manager` - the address for the new manager
 - `current_epoch_nr` - current epoch number
 - `current_approved_epoch` - currently approved epoch number
-- `epoch_length` - duration of the epoch expressed in number of blocks
 - `is_paused` - indicates if the protocol is paused, which means that no operations can be executed
 
 ### **For each epoch**
@@ -46,7 +45,6 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
       - `manager` (set to the address of the deployer)
       - `current_epoch_nr` (set to `0`)
       - `currently_approved_epoch_nr` (set to `0`)
-      - `epoch_length`
       - `is_paused` (set to `false`)
    - Emits event
 - **Change agent**

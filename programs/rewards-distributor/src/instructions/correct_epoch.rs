@@ -4,6 +4,7 @@ use crate::{
     state::{EpochAccount, RewardsAccount},
 };
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 
 /// [rewards_distributor::correct_epoch] accounts.
 #[derive(Accounts)]
@@ -17,11 +18,15 @@ pub struct CorrectEpoch<'info> {
     #[account(mut,
         seeds = [
          b"EpochAccount".as_ref(),
+         rewards_account.key().as_ref(),
          epoch_nr.to_le_bytes().as_ref()
     ],
     bump
     )]
     pub epoch_account: Account<'info, EpochAccount>,
+
+    /// The mint to distribute.
+    pub mint: Account<'info, Mint>,
 
     /// current manager of the program.
     pub agent: Signer<'info>,
@@ -43,7 +48,13 @@ pub fn correct_epoch_handler(
     );
 
     epoch_account.hash = root;
+    epoch_account.mint = ctx.accounts.mint.key();
 
-    emit!(EpochCorrected { root, epoch_nr });
+    emit!(EpochCorrected {
+        root,
+        epoch_nr,
+        mint: ctx.accounts.mint.key(),
+    });
+
     Ok(())
 }
