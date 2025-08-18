@@ -8,6 +8,7 @@ mod initialize;
 mod pause;
 mod propose_manager;
 mod unpause;
+mod withdraw_unclaimed;
 
 pub use accept_manager::*;
 pub use add_epoch::*;
@@ -19,3 +20,4 @@ pub use initialize::*;
 pub use pause::*;
 pub use propose_manager::*;
 pub use unpause::*;
+pub use withdraw_unclaimed::*;

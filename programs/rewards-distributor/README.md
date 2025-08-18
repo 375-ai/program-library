@@ -19,6 +19,7 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
       - Change the agent
       - Propose a new manager to take over the role (initiate the 2-step process for changing the manager)
       - Approve the rewards distribution information for an epoch
+      - Withdraw unclaimed tokens from epochs after the withdrawal period expires
 
 ## **Data**
 
@@ -30,11 +31,13 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
 - `current_epoch_nr` - current epoch number
 - `current_approved_epoch` - currently approved epoch number
 - `is_paused` - indicates if the protocol is paused, which means that no operations can be executed
+- `withdrawal_period_secs` - number of seconds after epoch approval before unclaimed tokens can be withdrawn (set once during initialization)
 
 ### **For each epoch**
 
 - `epoch_nr` - epoch number (starts at 1)
 - `is_approved` - indicates if the rewards distribution information has been approved by the manager
+- `approved_at` - timestamp when the epoch was approved (used for withdrawal period calculations)
 - `hash` - merkle tree root hash (rewards distribution information)
 
 ## **Instructions**
@@ -46,6 +49,7 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
       - `current_epoch_nr` (set to `0`)
       - `currently_approved_epoch_nr` (set to `0`)
       - `is_paused` (set to `false`)
+      - `withdrawal_period_secs` (set to the provided value in seconds)
    - Emits event
 - **Change agent**
    - Changes the address of the agent user.
@@ -112,6 +116,18 @@ The purpose of the Rewards Distributor is to enable users to claim rewards based
    - **Preconditions**
       - The `is_paused` flag is `true`
       - The caller must be a manager
+   - Emits event
+- **Withdraw unclaimed**
+   - Operations
+      - Transfers all remaining unclaimed tokens from the epoch ATA to the manager's wallet
+      - Closes the epoch token account to reclaim rent
+   - ***Note***: This operation allows recovery of tokens that remain unclaimed after the withdrawal period expires. The epoch account itself remains for historical validation.
+   - **Preconditions**
+      - The `is_approved` flag for the epoch must be `true`
+      - The withdrawal period must have elapsed since epoch approval
+      - The caller must be a manager
+      - The `is_paused` flag must be `false`
+      - There must be tokens remaining in the epoch
    - Emits event
 
 ## Rewards Distributor Program Diagram

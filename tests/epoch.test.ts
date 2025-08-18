@@ -4,9 +4,14 @@ import {
   RewardsDistributor,
   IDL as RewardsDistributorIDL,
 } from "../target/types/rewards_distributor";
-import {Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram} from "@solana/web3.js";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { assert, expect } from "chai";
-import {confirmedAirdrop, createNewMint, createTokenAccount} from "./utils";
+import { confirmedAirdrop, createNewMint, createTokenAccount } from "./utils";
 import { deriveEpochPDA, findClaimStatusKey } from "../src/utils/pda";
 import { getKeypair, writePublicKey } from "../src/utils/keyStore";
 import { u64 } from "@saberhq/token-utils";
@@ -40,24 +45,25 @@ describe("epoch tests", () => {
   // Generate a new keypair for the rewards account
   const rewardsAccountKeypair = new Keypair();
 
+  // Use a decimal mint to validate decimals handling
+  const decimals = 6;
+  const scale = new anchor.BN(10).pow(new anchor.BN(decimals));
   const elements = [
     {
       account: receiver.publicKey,
-      amount: new anchor.BN(10),
+      amount: new anchor.BN(10).mul(scale),
     },
   ];
   const tree = new BalanceTree(elements);
-
   const corrected_root: any = tree.getRoot();
 
   const epochTwoElements = [
     {
       account: epochTwoReceiver.publicKey,
-      amount: new anchor.BN(10),
+      amount: new anchor.BN(10).mul(scale),
     },
   ];
   const epochTwoTree = new BalanceTree(epochTwoElements);
-
   const epochTwoCorrected_root: any = epochTwoTree.getRoot();
 
   before(async () => {
@@ -67,9 +73,9 @@ describe("epoch tests", () => {
       LAMPORTS_PER_SOL * 5 // 5 SOL
     );
     await confirmedAirdrop(
-        provider.connection,
-        receiver.publicKey,
-        LAMPORTS_PER_SOL * 5 // 5 SOL
+      provider.connection,
+      receiver.publicKey,
+      LAMPORTS_PER_SOL * 5 // 5 SOL
     );
 
     payer = getKeypair("payer");
@@ -82,7 +88,7 @@ describe("epoch tests", () => {
       // freeze authority
       getKeypair("payer").publicKey,
       // decimals
-      0
+      decimals
     );
 
     managerTokenAccount = await createAccount(
@@ -100,8 +106,8 @@ describe("epoch tests", () => {
       managerTokenAccount,
       // tokenAccount,
       getKeypair("payer"),
-      // mint exactly 1 token
-      100,
+      // mint exactly 1 mil tokens
+      1_000_000 * Math.pow(10, decimals),
       // no `multiSigners`
       [],
       undefined,
@@ -116,7 +122,7 @@ describe("epoch tests", () => {
     });
 
     await program.methods
-      .initialize(agent.publicKey)
+      .initialize(agent.publicKey, new anchor.BN(365 * 24 * 60 * 60)) // 365 days withdrawal period
       .accounts({
         manager: manager.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,
@@ -346,7 +352,7 @@ describe("epoch tests", () => {
 
     try {
       await program.methods
-        .approveEpoch(current_epoch_nr, new anchor.BN(10))
+        .approveEpoch(current_epoch_nr, new anchor.BN(123.45).mul(scale))
         .accounts({
           rewardsAccount: rewardsAccountKeypair.publicKey,
           epochAccount: currentEpoch,
@@ -371,7 +377,6 @@ describe("epoch tests", () => {
     );
 
     const current_epoch_nr = new u64(rewardAccountBeforeCall.currentEpochNr);
-
     const [currentEpoch, currentEpochBump] = deriveEpochPDA({
       rewardsAccountKey: rewardsAccountKeypair.publicKey,
       epochNr: current_epoch_nr,
@@ -389,7 +394,7 @@ describe("epoch tests", () => {
     );
 
     await program.methods
-      .approveEpoch(current_epoch_nr, new anchor.BN(10))
+      .approveEpoch(current_epoch_nr, new anchor.BN(123456.789).mul(scale))
       .accounts({
         rewardsAccount: rewardsAccountKeypair.publicKey,
         epochAccount: currentEpoch,
@@ -406,8 +411,9 @@ describe("epoch tests", () => {
     );
     assert(epochAccountAfterCall.isApproved);
   });
+
   it("user cannot call claim with wrong mint", async () => {
-    const amount = new u64(10);
+    const amount = new u64(new anchor.BN(10).mul(scale));
     const index = new u64(0);
     const proof: any = tree.getProof(
       index.toNumber(),
@@ -430,7 +436,7 @@ describe("epoch tests", () => {
       // freeze authority
       getKeypair("payer").publicKey,
       // decimals
-      0
+      decimals
     );
 
     const receiverTokenAccount = await getAssociatedTokenAddress(
@@ -481,7 +487,7 @@ describe("epoch tests", () => {
   });
 
   it("user can call claim", async () => {
-    const amount = new u64(10);
+    const amount = new u64(new anchor.BN(10).mul(scale));
     const index = new u64(0);
     const proof: any = tree.getProof(
       index.toNumber(),
@@ -541,9 +547,9 @@ describe("epoch tests", () => {
     const fakeReceiver = Keypair.generate();
 
     await confirmedAirdrop(
-        provider.connection,
-        fakeReceiver.publicKey,
-        LAMPORTS_PER_SOL * 5 // 5 SOL
+      provider.connection,
+      fakeReceiver.publicKey,
+      LAMPORTS_PER_SOL * 5 // 5 SOL
     );
 
     const rewardAccountBeforeCall = await program.account.rewardsAccount.fetch(
@@ -655,7 +661,7 @@ describe("epoch tests", () => {
     );
 
     await program.methods
-      .approveEpoch(current_epoch_nr, new anchor.BN(10))
+      .approveEpoch(current_epoch_nr, new anchor.BN(10).mul(scale))
       .accounts({
         rewardsAccount: rewardsAccountKeypair.publicKey,
         epochAccount: currentEpoch,

@@ -26,7 +26,7 @@ describe("pause instruction", () => {
     });
 
     await program.methods
-      .initialize(agent.publicKey)
+      .initialize(agent.publicKey, new anchor.BN(365 * 24 * 60 * 60)) // 365 days withdrawal period
       .accounts({
         manager: manager.publicKey,
         rewardsAccount: rewardsAccountKeypair.publicKey,

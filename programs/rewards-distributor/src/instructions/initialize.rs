@@ -22,7 +22,7 @@ pub struct Initialize<'info> {
 }
 
 /// initialize handler.
-pub fn initialize_handler(ctx: Context<Initialize>, agent: Pubkey) -> Result<()> {
+pub fn initialize_handler(ctx: Context<Initialize>, agent: Pubkey, withdrawal_period_secs: u64) -> Result<()> {
     // Get a mutable reference to the rewards account from the context.
     let rewards_account = &mut ctx.accounts.rewards_account;
 
@@ -30,6 +30,7 @@ pub fn initialize_handler(ctx: Context<Initialize>, agent: Pubkey) -> Result<()>
     rewards_account.manager = ctx.accounts.manager.key();
     rewards_account.agent = agent;
     rewards_account.current_epoch_nr = 0;
+    rewards_account.withdrawal_period_secs = withdrawal_period_secs;
 
     // Emit an event to signal that the program has been initialized.
     emit!(Initialized {

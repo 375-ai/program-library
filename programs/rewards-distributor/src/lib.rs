@@ -20,8 +20,9 @@ pub mod rewards_distributor {
     ///
     /// * `ctx` - Context for the instruction.
     /// * `agent` - The address of the agent user.
-    pub fn initialize(ctx: Context<Initialize>, agent: Pubkey) -> Result<()> {
-        initialize_handler(ctx, agent)
+    /// * `withdrawal_period_secs` - Number of seconds after epoch approval before tokens can be withdrawn.
+    pub fn initialize(ctx: Context<Initialize>, agent: Pubkey, withdrawal_period_secs: u64) -> Result<()> {
+        initialize_handler(ctx, agent, withdrawal_period_secs)
     }
 
     /// Propose a Pubkey to be the `Manager`.
@@ -175,5 +176,45 @@ pub mod rewards_distributor {
     /// * `ShouldBePaused` - Thrown if the protocol is already unpaused.
     pub fn unpause(ctx: Context<UnPause>) -> Result<()> {
         unpause_handler(ctx)
+    }
+
+    /// Withdraws unclaimed tokens from an epoch after the withdrawal period expires.
+    /// 
+    /// This instruction allows the manager to reclaim tokens that remain unclaimed
+    /// after the withdrawal period specified during program initialization.
+    /// 
+    /// ## Security Features
+    /// - **Manager only**: Only the program manager can call this instruction
+    /// - **Secure destination**: Tokens return to manager's wallet
+    /// - **Time lock**: Uses withdrawal period set during initialization (immutable)
+    /// - **Account cleanup**: Closes empty ATA to reclaim rent
+    /// - **Historical data**: Keeps epoch account for approval validation
+    /// 
+    /// ## Use cases
+    /// - Reclaim tokens after users don't claim within timeframe
+    /// - Recover tokens from incorrect merkle root distributions
+    /// - Clean up empty token accounts to reclaim rent
+    /// 
+    /// # Arguments
+    ///
+    /// * `ctx` - Context containing all required accounts
+    /// * `epoch_nr` - The epoch number to withdraw tokens from
+    ///
+    /// # Errors
+    ///
+    /// * `Unauthorized` - Only manager can call this instruction
+    /// * `ShouldNotBePaused` - Program must not be paused
+    /// * `EpochShouldBeApproved` - Epoch must be approved first
+    /// * `WithdrawalPeriodNotReached` - Must wait for withdrawal period set at init
+    /// * `NoTokensToWithdraw` - No tokens remaining in epoch
+    /// 
+    /// # Events
+    /// 
+    /// Emits `UnclaimedWithdrawn` event with withdrawal details
+    pub fn withdraw_unclaimed(
+        ctx: Context<WithdrawUnclaimed>, 
+        epoch_nr: u64
+    ) -> Result<()> {
+        withdraw_unclaimed_handler(ctx, epoch_nr)
     }
 }

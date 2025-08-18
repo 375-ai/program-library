@@ -23,6 +23,10 @@ pub struct RewardsAccount {
 
     /// Indicates if the program is paused.
     pub is_paused: bool,
+
+    /// Number of seconds after epoch approval before unclaimed tokens can be withdrawn.
+    /// This value is set once during initialization and cannot be changed.
+    pub withdrawal_period_secs: u64,
 }
 
 #[account]
@@ -54,6 +58,9 @@ pub struct EpochAccount {
 
     /// Indicates if the epoch is approved.
     pub is_approved: bool,
+
+    /// Timestamp when the epoch was approved (for withdrawal eligibility).
+    pub approved_at: i64,
 
     /// Hash of the epoch.
     pub hash: [u8; 32],

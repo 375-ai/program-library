@@ -49,4 +49,12 @@ pub enum ErrorCode {
     ///Error indicating that the operation cannot be performed due to an invalid mint account.
     #[msg("Operation not allowed: Invalid mint account.")]
     InvalidMintAccount,
+
+    /// Error indicating that the withdrawal period has not been reached yet.
+    #[msg("Withdrawal period has not been reached yet.")]
+    WithdrawalPeriodNotReached,
+
+    /// Error indicating that there are no tokens to withdraw.
+    #[msg("No tokens to withdraw.")]
+    NoTokensToWithdraw,
 }

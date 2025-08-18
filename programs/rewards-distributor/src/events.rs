@@ -99,3 +99,19 @@ pub struct EpochCorrected {
 pub struct EpochApproved {
     pub epoch_nr: u64,
 }
+
+/// Event emitted when unclaimed tokens are withdrawn by the manager.
+///
+/// This event provides transparency for token withdrawal operations,
+/// including the amount withdrawn and destination wallet.
+#[event]
+pub struct UnclaimedWithdrawn {
+    /// The epoch number from which tokens were withdrawn
+    pub epoch_nr: u64,
+    /// Amount of tokens withdrawn
+    pub amount: u64,
+    /// Public key of the wallet that received the tokens (manager)
+    pub withdrawn_to: Pubkey,
+    /// Timestamp when the withdrawal occurred
+    pub withdrawn_at: i64,
+}

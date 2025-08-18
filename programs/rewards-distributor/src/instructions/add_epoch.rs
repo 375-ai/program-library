@@ -59,6 +59,7 @@ pub fn add_epoch_handler(ctx: Context<AddEpoch>, bump: u8, root: [u8; 32]) -> Re
     // set epoch data
     current_epoch_account.epoch_nr = current_epoch_nr + 1;
     current_epoch_account.is_approved = false;
+    current_epoch_account.approved_at = 0; // Initialize as 0, will be set when epoch is approved
     current_epoch_account.hash = root.clone();
     current_epoch_account.bump = bump;
     current_epoch_account.mint = ctx.accounts.mint.key();

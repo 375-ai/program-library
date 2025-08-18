@@ -72,6 +72,10 @@ pub fn approve_epoch_handler(ctx: Context<ApproveEpoch>, epoch_nr: u64, amount: 
     );
 
     epoch_account.is_approved = true;
+    
+    // Track approval timestamp for withdrawal eligibility
+    let clock = Clock::get()?;
+    epoch_account.approved_at = clock.unix_timestamp;
 
     // Invoke the transfer instruction on the token program
     transfer(
@@ -83,7 +87,7 @@ pub fn approve_epoch_handler(ctx: Context<ApproveEpoch>, epoch_nr: u64, amount: 
                 authority: ctx.accounts.manager.to_account_info(),
             },
         ),
-        amount * 10u64.pow(ctx.accounts.mint_account.decimals as u32), // Transfer amount, adjust for decimals
+        amount, // Amount is expected to be in base units (according to mint decimals)
     )?;
 
     emit!(EpochApproved { epoch_nr });
